@@ -15,7 +15,7 @@ coverage/
 # Env (não versionar chaves)
 .env
 .env.*
-!.env.example
+!.env*.example
 
 # CRA / Vite
 *.local
