@@ -1,0 +1,43 @@
+# Node / JS
+node_modules/
+npm-debug.log*
+yarn-*.log*
+pnpm-debug.log*
+*.log
+.eslintcache
+*.tsbuildinfo
+
+# Build / Test
+build/
+dist/
+coverage/
+
+# Env (não versionar chaves)
+.env
+.env.*
+!.env.example
+
+# CRA / Vite
+*.local
+
+# Editors / OS
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# Firebase / Emuladores
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+storage-debug.log
+/emulator-data/
+
+# Misc
+.history/
