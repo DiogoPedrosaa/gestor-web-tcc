@@ -1,10 +1,24 @@
-import { Users2, Apple, Activity, AlertTriangle, TrendingUp } from "lucide-react";
+
+import { Users2, Apple, Activity, AlertTriangle} from "lucide-react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../services/firebase";
+import { useEffect, useState } from "react";
 import "./styles.css";
 
+
 export default function DashboardPage() {
+  const [foodsCount, setFoodsCount] = useState<number>(0);
+
+  useEffect(() => {
+    async function fetchFoodsCount() {
+      const snap = await getDocs(collection(db, "foods"));
+      setFoodsCount(snap.size);
+    }
+    fetchFoodsCount();
+  }, []);
+
   return (
     <div className="dash-grid">
-      
       <section className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-head">
@@ -12,7 +26,6 @@ export default function DashboardPage() {
             <div className="kpi-ico"><Users2 size={18} /></div>
           </div>
           <div className="kpi-value">1,248</div>
-          <div className="kpi-foot kpi-foot--up"><TrendingUp size={14}/> +12%</div>
         </div>
 
         <div className="kpi-card kpi-green">
@@ -20,8 +33,7 @@ export default function DashboardPage() {
             <span>Alimentos Cadastrados</span>
             <div className="kpi-ico"><Apple size={18} /></div>
           </div>
-          <div className="kpi-value">3,567</div>
-          <div className="kpi-foot kpi-foot--up"><TrendingUp size={14}/> +8%</div>
+          <div className="kpi-value">{foodsCount}</div>
         </div>
 
         <div className="kpi-card">
@@ -30,7 +42,6 @@ export default function DashboardPage() {
             <div className="kpi-ico"><Activity size={18} /></div>
           </div>
           <div className="kpi-value">142</div>
-          <div className="kpi-foot kpi-foot--up"><TrendingUp size={14}/> +5%</div>
         </div>
 
         <div className="kpi-card kpi-warn">
@@ -84,7 +95,6 @@ export default function DashboardPage() {
           </li>
         </ul>
       </section>
-
 
       <section className="panel">
         <div className="panel-title">Estatísticas Rápidas</div>
