@@ -1,28 +1,60 @@
-import { Users2, Apple, Activity, AlertTriangle } from "lucide-react";
-import { collection, getDocs } from "firebase/firestore";
+import { Users2, Pill, Activity, AlertTriangle, Apple } from "lucide-react";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../services/firebase";
 import { useEffect, useMemo, useState } from "react";
 import "./styles.css";
 
 export default function DashboardPage() {
   const [foodsCount, setFoodsCount] = useState<number>(0);
+  const [usersCount, setUsersCount] = useState<number>(0);
+  const [activeUsersCount, setActiveUsersCount] = useState<number>(0);
+  const [medicationsCount, setMedicationsCount] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
 
-  // mock de métricas (substitua por dados reais quando tiver backend/consultas)
+  // mock de métricas para os gráficos
   const mediaGlicemica = 126; // mg/dL
-  const usuariosAtivos = 892;
   const taxaAdocao = 87; // %
 
   // séries fictícias para gráficos (ex.: últimos 7 dias)
   const serieGlicemia = useMemo(() => [118, 122, 130, 125, 129, 127, 126], []);
-  const serieUsuarios = useMemo(() => [810, 828, 835, 850, 864, 881, 892], []);
+  const serieUsuarios = useMemo(() => [810, 828, 835, 850, 864, 881, activeUsersCount], [activeUsersCount]);
   const serieAdocao = useMemo(() => [82, 83, 84, 85, 85, 86, 87], []);
 
   useEffect(() => {
-    async function fetchFoodsCount() {
-      const snap = await getDocs(collection(db, "foods"));
-      setFoodsCount(snap.size);
+    async function fetchDashboardData() {
+      try {
+        setLoading(true);
+
+        // Buscar total de alimentos
+        const foodsSnap = await getDocs(collection(db, "foods"));
+        setFoodsCount(foodsSnap.size);
+
+        // Buscar total de usuários (role = "user")
+        const usersQuery = query(collection(db, "users"), where("role", "==", "user"));
+        const usersSnap = await getDocs(usersQuery);
+        setUsersCount(usersSnap.size);
+
+        // Buscar usuários ativos (role = "user" e status = "active")
+        const activeUsersQuery = query(
+          collection(db, "users"), 
+          where("role", "==", "user"),
+          where("status", "==", "active")
+        );
+        const activeUsersSnap = await getDocs(activeUsersQuery);
+        setActiveUsersCount(activeUsersSnap.size);
+
+        // Buscar total de medicamentos
+        const medicationsSnap = await getDocs(collection(db, "medications"));
+        setMedicationsCount(medicationsSnap.size);
+
+      } catch (error) {
+        console.error("Erro ao buscar dados do dashboard:", error);
+      } finally {
+        setLoading(false);
+      }
     }
-    fetchFoodsCount();
+
+    fetchDashboardData();
   }, []);
 
   return (
@@ -34,7 +66,9 @@ export default function DashboardPage() {
             <span>Total de Usuários</span>
             <div className="kpi-ico"><Users2 size={18} /></div>
           </div>
-          <div className="kpi-value">1,248</div>
+          <div className="kpi-value">
+            {loading ? "..." : usersCount.toLocaleString()}
+          </div>
         </div>
 
         <div className="kpi-card kpi-green">
@@ -42,24 +76,29 @@ export default function DashboardPage() {
             <span>Alimentos Cadastrados</span>
             <div className="kpi-ico"><Apple size={18} /></div>
           </div>
-          <div className="kpi-value">{foodsCount}</div>
+          <div className="kpi-value">
+            {loading ? "..." : foodsCount.toLocaleString()}
+          </div>
         </div>
 
         <div className="kpi-card">
           <div className="kpi-head">
-            <span>Medições Hoje</span>
-            <div className="kpi-ico"><Activity size={18} /></div>
+            <span>Usuários Ativos</span>
+            <div className="kpi-ico"><Users2 size={18} /></div>
           </div>
-          <div className="kpi-value">142</div>
+          <div className="kpi-value">
+            {loading ? "..." : activeUsersCount.toLocaleString()}
+          </div>
         </div>
 
-        <div className="kpi-card kpi-warn">
+        <div className="kpi-card kpi-green">
           <div className="kpi-head">
-            <span>Alertas Pendentes</span>
-            <div className="kpi-ico"><AlertTriangle size={18} /></div>
+            <span>Medicações Cadastradas</span>
+            <div className="kpi-ico"><Pill size={18} /></div>
           </div>
-          <div className="kpi-value">23</div>
-          <div className="kpi-foot">Requerem atenção</div>
+          <div className="kpi-value">
+            {loading ? "..." : medicationsCount.toLocaleString()}
+          </div>
         </div>
       </section>
 
@@ -95,7 +134,9 @@ export default function DashboardPage() {
             </div>
 
             <div className="dash-card-body">
-              <div className="big-number">{usuariosAtivos}</div>
+              <div className="big-number">
+                {loading ? "..." : activeUsersCount.toLocaleString()}
+              </div>
               <Bars data={serieUsuarios} />
             </div>
           </div>
