@@ -7,6 +7,7 @@ import UsersPage from "../pages/Users";
 import FoodsPage from "../pages/Foods";
 import ReportsPage from "../pages/Reports";
 import LoginPage from "../pages/Login";
+import ComplicationsPage from "../pages/Complications";
 
 export default function AppRoutes() {
   return (
@@ -23,6 +24,7 @@ export default function AppRoutes() {
             <Route path="/usuarios"  element={<ProtectedRoute requireAdmin><UsersPage /></ProtectedRoute>} />
             <Route path="/alimentos" element={<ProtectedRoute requireAdmin><FoodsPage /></ProtectedRoute>} />
             <Route path="/relatorios" element={<ProtectedRoute requireAdmin><ReportsPage /></ProtectedRoute>} />
+            <Route path="/complicações" element={<ProtectedRoute requireAdmin><ComplicationsPage /></ProtectedRoute>} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />
