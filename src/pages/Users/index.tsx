@@ -88,8 +88,17 @@ export default function UsersPage() {
 
   function formatCPF(cpf: string): string {
     if (!cpf) return "Não informado";
-    // Mascarar CPF: 123.456.789-XX
-    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-XX");
+    
+    // Remove qualquer formatação existente (pontos, traços, espaços)
+    const cleanCPF = cpf.replace(/\D/g, '');
+    
+    // Verifica se tem 11 dígitos
+    if (cleanCPF.length !== 11) {
+      return "CPF inválido";
+    }
+    
+    // Aplica a censura: 123.***.***-**
+    return `${cleanCPF.slice(0, 3)}.***.***-**`;
   }
 
   function formatDate(date: any): string {
@@ -218,7 +227,7 @@ export default function UsersPage() {
               </p>
 
               <div className="modal-actions" style={{ marginTop: "24px" }}>
-                <button type="button" className="btn-outline" onClick={closeStatusModal}>
+                <button type="button" className="btn-danger" onClick={closeStatusModal}>
                   Não
                 </button>
                 <button
