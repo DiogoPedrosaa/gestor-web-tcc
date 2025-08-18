@@ -33,8 +33,10 @@ type SortBy = "createdAt_desc" | "name_asc" | "name_desc";
 export default function FoodsPage() {
   // modal state
   const [open, setOpen] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [mode, setMode] = useState<"add" | "edit">("add");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingFood, setDeletingFood] = useState<Food | null>(null);
 
   // form state
   const [name, setName] = useState("");
@@ -44,6 +46,7 @@ export default function FoodsPage() {
   const [portionDesc, setPortionDesc] = useState<string>("");
 
   const [loading, setLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   // list state
@@ -138,6 +141,30 @@ export default function FoodsPage() {
     setOpen(false);
   }
 
+  function openDeleteModal(food: Food) {
+    setDeletingFood(food);
+    setShowDeleteModal(true);
+  }
+
+  function closeDeleteModal() {
+    setShowDeleteModal(false);
+    setDeletingFood(null);
+  }
+
+  async function confirmDelete() {
+    if (!deletingFood) return;
+
+    try {
+      setDeleteLoading(true);
+      await deleteDoc(doc(db, "foods", deletingFood.id));
+      closeDeleteModal();
+    } catch (e: any) {
+      alert(e.message || "Não foi possível remover.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
@@ -170,16 +197,6 @@ export default function FoodsPage() {
       setErr(e.message || "Não foi possível salvar.");
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleDelete(id: string) {
-    const ok = window.confirm("Remover este alimento? Esta ação não pode ser desfeita.");
-    if (!ok) return;
-    try {
-      await deleteDoc(doc(db, "foods", id));
-    } catch (e: any) {
-      alert(e.message || "Não foi possível remover.");
     }
   }
 
@@ -252,7 +269,7 @@ export default function FoodsPage() {
 
               <div className="food-actions">
                 <button className="icon-btn" aria-label="Editar" onClick={() => openEditModal(f)}><Edit3 size={18} /></button>
-                <button className="icon-btn danger" aria-label="Remover" onClick={() => handleDelete(f.id)}><Trash2 size={18} /></button>
+                <button className="icon-btn danger" aria-label="Remover" onClick={() => openDeleteModal(f)}><Trash2 size={18} /></button>
               </div>
             </li>
           ))}
@@ -282,7 +299,7 @@ export default function FoodsPage() {
         </button>
       </div>
 
-      {/* Modal */}
+      {/* Modal de cadastro/edição */}
       {open && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={mode === "add" ? "Adicionar alimento" : "Editar alimento"}>
           <div className="modal">
@@ -354,7 +371,7 @@ export default function FoodsPage() {
               />
 
               <div className="modal-actions">
-                <button type="button" className="btn-ghost" onClick={closeModal}>
+                <button type="button" className="btn-danger" onClick={closeModal}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn-primary" disabled={loading}>
@@ -368,6 +385,39 @@ export default function FoodsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de confirmação de exclusão */}
+      {showDeleteModal && deletingFood && (
+        <>
+          <div className="modal-backdrop" onClick={closeDeleteModal} />
+          <div className="modal">
+            <div className="modal-head">
+              <h2>Confirmar Exclusão</h2>
+            </div>
+
+            <div className="modal-form">
+              <p>Tem certeza que deseja excluir o alimento <strong>"{deletingFood.name}"</strong>?</p>
+              <p style={{ color: "#64748b", fontSize: "14px", marginTop: "8px" }}>
+                Esta ação não pode ser desfeita.
+              </p>
+
+              <div className="modal-actions" style={{ marginTop: "24px" }}>
+                <button type="button" className="btn-ghost" onClick={closeDeleteModal}>
+                  Cancelar
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-danger" 
+                  onClick={confirmDelete}
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? "Excluindo..." : "Excluir"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

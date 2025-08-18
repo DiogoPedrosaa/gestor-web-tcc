@@ -332,10 +332,15 @@
 }
 
 .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 6px;
+  display: flex;
+  gap: 12px; /* mantém o espaçamento entre os botões */
+  margin-top: 24px;
+  align-items: center;
+}
+
+.modal-actions button {
+  flex: 1; /* ambos os botões ocupam o mesmo espaço */
+  max-width: 48%; /* limita a largura máxima para não ficarem muito largos */
 }
 
 .btn-ghost {
@@ -355,6 +360,27 @@
     padding: 10px 12px;
     cursor: pointer;
     font-weight: 600;
+}
+
+.btn-danger {
+  padding: 10px 12px;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+  transition: all 0.2s;
+  margin-top: 12px;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .modal-foot-hint {
