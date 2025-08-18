@@ -1,13 +1,21 @@
-
-import { Users2, Apple, Activity, AlertTriangle} from "lucide-react";
+import { Users2, Apple, Activity, AlertTriangle } from "lucide-react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../services/firebase";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./styles.css";
-
 
 export default function DashboardPage() {
   const [foodsCount, setFoodsCount] = useState<number>(0);
+
+  // mock de métricas (substitua por dados reais quando tiver backend/consultas)
+  const mediaGlicemica = 126; // mg/dL
+  const usuariosAtivos = 892;
+  const taxaAdocao = 87; // %
+
+  // séries fictícias para gráficos (ex.: últimos 7 dias)
+  const serieGlicemia = useMemo(() => [118, 122, 130, 125, 129, 127, 126], []);
+  const serieUsuarios = useMemo(() => [810, 828, 835, 850, 864, 881, 892], []);
+  const serieAdocao = useMemo(() => [82, 83, 84, 85, 85, 86, 87], []);
 
   useEffect(() => {
     async function fetchFoodsCount() {
@@ -19,6 +27,7 @@ export default function DashboardPage() {
 
   return (
     <div className="dash-grid">
+      {/* KPIs do topo */}
       <section className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-head">
@@ -54,65 +63,159 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Atividade recente */}
+      {/* DASHBOARD (substitui "Atividade Recente" + "Estatísticas Rápidas") */}
       <section className="panel">
-        <div className="panel-title">Atividade Recente</div>
-        <ul className="activity">
-          <li>
-            <div className="avatar">MS</div>
-            <div className="info">
-              <div><strong>Maria Silva</strong> <span className="tag tag-success">Sucesso</span></div>
-              <p>Registrou medição de glicose: 120 mg/dL</p>
-              <span className="muted">há 5 min</span>
-            </div>
-          </li>
+        <div className="panel-title">Dashboard</div>
 
-          <li>
-            <div className="avatar">JS</div>
-            <div className="info">
-              <div><strong>João Santos</strong> <span className="tag">Info</span></div>
-              <p>Adicionou novo alimento: Maçã Verde</p>
-              <span className="muted">há 12 min</span>
+        <div className="dash-cards">
+          {/* Card 1: Média Glicêmica */}
+          <div className="dash-card">
+            <div className="dash-card-head">
+              <div className="dash-card-title">
+                <Activity size={18} />
+                <span>Média Glicêmica</span>
+              </div>
+              <span className="muted">Últimos 7 dias</span>
             </div>
-          </li>
 
-          <li>
-            <div className="avatar">AC</div>
-            <div className="info">
-              <div><strong>Ana Costa</strong> <span className="tag tag-warn">Atenção</span></div>
-              <p>Medição alta detectada: 180 mg/dL</p>
-              <span className="muted">há 25 min</span>
+            <div className="dash-card-body">
+              <Gauge value={mediaGlicemica} min={70} max={180} unit="mg/dL" />
+              <Sparkline data={serieGlicemia} maxY={180} />
             </div>
-          </li>
-
-          <li>
-            <div className="avatar">CL</div>
-            <div className="info">
-              <div><strong>Carlos Lima</strong> <span className="tag">Info</span></div>
-              <p>Novo usuário registrado</p>
-              <span className="muted">há 38 min</span>
-            </div>
-          </li>
-        </ul>
-      </section>
-
-      <section className="panel">
-        <div className="panel-title">Estatísticas Rápidas</div>
-        <div className="stats">
-          <div className="stat">
-            <span className="label">Média Glicêmica</span>
-            <span className="value value-green">126 mg/dL</span>
           </div>
-          <div className="stat">
-            <span className="label">Usuários Ativos</span>
-            <span className="value value-blue">892</span>
+
+          {/* Card 2: Usuários Ativos */}
+          <div className="dash-card">
+            <div className="dash-card-head">
+              <div className="dash-card-title">
+                <Users2 size={18} />
+                <span>Usuários Ativos</span>
+              </div>
+              <span className="muted">Últimos 7 dias</span>
+            </div>
+
+            <div className="dash-card-body">
+              <div className="big-number">{usuariosAtivos}</div>
+              <Bars data={serieUsuarios} />
+            </div>
           </div>
-          <div className="stat">
-            <span className="label">Taxa de Adoção</span>
-            <span className="value">87%</span>
+
+          {/* Card 3: Taxa de Adoção */}
+          <div className="dash-card">
+            <div className="dash-card-head">
+              <div className="dash-card-title">
+                <span className="dot dot-blue" />
+                <span>Taxa de Adoção</span>
+              </div>
+              <span className="muted">Últimos 7 dias</span>
+            </div>
+
+            <div className="dash-card-body">
+              <div className="big-number">{taxaAdocao}%</div>
+              <Progress value={taxaAdocao} />
+              <Sparkline data={serieAdocao} maxY={100} />
+            </div>
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+/* ---------- Componentes visuais simples em SVG ---------- */
+
+function Gauge({
+  value,
+  min = 0,
+  max = 100,
+  unit,
+}: {
+  value: number;
+  min?: number;
+  max?: number;
+  unit?: string;
+}) {
+  const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
+  const radius = 52;
+  const circumference = Math.PI * radius; // semi-círculo
+  const stroke = circumference * pct;
+
+  return (
+    <div className="gauge">
+      <svg viewBox="0 0 120 70" width="100%" height="70">
+        {/* trilho */}
+        <path
+          d="M10,60 A50,50 0 0 1 110,60"
+          fill="none"
+          stroke="var(--border)"
+          strokeWidth="12"
+          strokeLinecap="round"
+        />
+        {/* valor */}
+        <path
+          d="M10,60 A50,50 0 0 1 110,60"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="12"
+          strokeLinecap="round"
+          strokeDasharray={`${stroke} ${circumference}`}
+        />
+      </svg>
+      <div className="gauge-value">
+        {value} {unit}
+        <span className="gauge-sub">Faixa alvo: {min}-{max} {unit}</span>
+      </div>
+    </div>
+  );
+}
+
+function Sparkline({ data, maxY = Math.max(...data) }: { data: number[]; maxY?: number }) {
+  const points = data
+    .map((v, i) => {
+      const x = (i / (data.length - 1)) * 100;
+      const y = 100 - (v / maxY) * 100;
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  return (
+    <div className="sparkline">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        <polyline
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          points={points}
+        />
+      </svg>
+    </div>
+  );
+}
+
+function Bars({ data }: { data: number[] }) {
+  const max = Math.max(...data);
+  const width = 100 / data.length;
+
+  return (
+    <div className="bars">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        {data.map((v, i) => {
+          const h = (v / max) * 100;
+          const x = i * width + 4 * 0.5; // padding leve
+          const w = width - 4; // gap
+          const y = 100 - h;
+          return <rect key={i} x={x} y={y} width={w} height={h} rx="2" />;
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function Progress({ value }: { value: number }) {
+  const pct = Math.max(0, Math.min(100, value));
+  return (
+    <div className="progress">
+      <div className="progress-bar" style={{ width: `${pct}%` }} />
     </div>
   );
 }
