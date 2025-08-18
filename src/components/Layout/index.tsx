@@ -42,6 +42,9 @@ export default function Layout() {
         <NavLink to="/usuarios" className="nav-item" onClick={onItemClick}>
           <Users size={18} /> <span>Usuários</span>
         </NavLink>
+        <NavLink to="/administradores" className="nav-item" onClick={onItemClick}>
+          <Users size={18} /> <span>Administradores</span>
+        </NavLink>
         <NavLink to="/alimentos" className="nav-item" onClick={onItemClick}>
           <Apple size={18} /> <span>Alimentos</span>
         </NavLink>
