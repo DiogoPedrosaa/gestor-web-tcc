@@ -65,7 +65,7 @@ export default function LoginPage() {
             </svg>
           </div></div>
 
-          <h1 className="title">Diabetes<span className="title-emph">Monitor</span></h1>
+          <h1 className="title">Glico<span className="title-emph">Info</span></h1>
           <p className="subtitle">Acesse sua plataforma de monitoramento pessoal</p>
 
           {location?.state?.reason === "not-admin" && (
