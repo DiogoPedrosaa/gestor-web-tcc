@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, Apple, BarChart3, LogOut, Menu, X } from "lucide-react";
+import { LayoutDashboard, Users, Apple, BarChart3, LogOut, Menu, X, Heart } from "lucide-react"; // Adicionar Heart
 import { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { getAuth } from "firebase/auth";
@@ -45,9 +45,13 @@ export default function Layout() {
         <NavLink to="/alimentos" className="nav-item" onClick={onItemClick}>
           <Apple size={18} /> <span>Alimentos</span>
         </NavLink>
+        <NavLink to="/complicações" className="nav-item" onClick={onItemClick}>
+          <Heart size={18} /> <span>Complicações</span>
+        </NavLink>
         <NavLink to="/relatorios" className="nav-item" onClick={onItemClick}>
           <BarChart3 size={18} /> <span>Relatórios</span>
         </NavLink>
+
         <button className="nav-item nav-danger" onClick={() => { onItemClick?.(); handleSignOut(); }}>
           <LogOut size={18} /> <span>Sair</span>
         </button>
