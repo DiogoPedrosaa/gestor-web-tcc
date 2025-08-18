@@ -353,8 +353,13 @@
 @media (max-width: 700px) {
   .admins-title {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center; /* Centralizar em vez de flex-start */
     gap: 12px;
+    text-align: center; /* Centralizar texto */
+  }
+  
+  .admins-title-left {
+    align-items: center; /* Centralizar o título */
   }
   
   .admins-toolbar {
