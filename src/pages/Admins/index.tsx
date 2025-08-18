@@ -11,8 +11,10 @@ import {
   query,
   where 
 } from "firebase/firestore";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth, db } from "../../services/firebase";
+import { useAuth } from "../../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import "./styles.css";
 
 type Admin = {
@@ -43,6 +45,9 @@ export default function AdminsPage() {
   const [formPassword, setFormPassword] = useState("");
   const [formConfirmPassword, setFormConfirmPassword] = useState("");
   const [formLoading, setFormLoading] = useState(false);
+  
+  const { firebaseUser } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchAdmins();
@@ -139,26 +144,36 @@ export default function AdminsPage() {
         throw new Error("E-mail já está em uso por outro administrador");
       }
 
-      // Criar usuário no Firebase Auth
+      // 1. Criar usuário no Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, formEmail, formPassword);
       
-      // Salvar dados do admin no Firestore
+      // 2. Salvar dados do admin no Firestore IMEDIATAMENTE e AGUARDAR
       const adminData = {
         name: formName.trim(),
         email: formEmail.toLowerCase(),
         role: "admin",
         status: "active",
-        createdAt: new Date()
+        createdAt: new Date(),
+        uid: userCredential.user.uid
       };
 
-      await addDoc(collection(db, "users"), {
-        ...adminData,
-        uid: userCredential.user.uid
-      });
-
-      await fetchAdmins();
+      // Garantir que isso termine antes de continuar
+      await addDoc(collection(db, "users"), adminData);
+      
+      // 3. Fazer logout do novo usuário criado
+      await signOut(auth);
+      
+      // 4. Fechar modal e mostrar sucesso
       closeModal();
+      
+      // 5. Mostrar mensagem de sucesso e redirecionar para login
+      alert("Administrador criado com sucesso! Você será redirecionado para fazer login novamente.");
+      
+      // 6. Redirecionar para login
+      navigate("/login", { replace: true });
+      
     } catch (e: any) {
+      console.error("Erro completo:", e);
       setError(e.message || "Erro ao criar administrador");
     } finally {
       setFormLoading(false);
@@ -351,7 +366,7 @@ export default function AdminsPage() {
               />
 
               <div className="modal-actions">
-                <button type="button" className="btn-outline" onClick={closeModal}>
+                <button type="button" className="btn-danger" onClick={closeModal}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn-primary" disabled={formLoading}>
