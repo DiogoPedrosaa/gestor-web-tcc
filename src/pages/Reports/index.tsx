@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { FileText, Filter, Download, X, RefreshCw, Calendar, FileDown } from "lucide-react";
+import React, { useState } from "react";
+import { FileText, Filter, Download, X, RefreshCw, FileDown } from "lucide-react";
 import {
   collection,
   getDocs,
   query,
   where,
-  orderBy,
   Timestamp
 } from "firebase/firestore";
 import { db } from "../../services/firebase";
@@ -360,16 +359,13 @@ export default function ReportsPage() {
     return Math.ceil(reportData.length / recordsPerPage);
   }
 
-  // Função para calcular larguras inteligentes das colunas
-  // (Removido por duplicidade - mantida apenas a versão mais abaixo)
-
   // Função para calcular comprimento máximo baseado na largura da coluna
   function getMaxLengthForColumn(column: string, width: number): number {
     const charsPerMm = 2.5;
     return Math.floor(width * charsPerMm);
   }
 
-  // Exportar CSV
+  // Exportar CSV - CORRIGIDO
   function exportToCSV() {
     if (reportData.length === 0) {
       setError("Não há dados para exportar");
@@ -380,19 +376,40 @@ export default function ReportsPage() {
 
     try {
       const columns = getTableColumns();
-      const csvContent = [
-        columns.map(col => formatColumnLabel(col)).join(","),
+      
+      // Adicionar BOM UTF-8 para Excel reconhecer acentuação corretamente
+      const BOM = "\uFEFF";
+      
+      // Montar CSV linha por linha
+      const rows = [
+        // Cabeçalho
+        columns.map(col => formatColumnLabel(col)).join(";"), // Mudado de , para ;
+        
+        // Dados
         ...reportData.map(row => 
           columns.map(col => {
-            const value = row[col] || "";
-            return typeof value === "string" && (value.includes(",") || value.includes('"'))
-              ? `"${value.replace(/"/g, '""')}"` 
-              : value;
-          }).join(",")
+            let value = row[col] || "";
+            
+            // Converter para string
+            value = String(value);
+            
+            // Se contém ponto-e-vírgula, aspas ou quebra de linha, envolver em aspas
+            if (value.includes(";") || value.includes('"') || value.includes("\n")) {
+              value = `"${value.replace(/"/g, '""')}"`;
+            }
+            
+            return value;
+          }).join(";") // Mudado de , para ;
         ),
+        
+        // Linha vazia
         "",
+        
+        // Rodapé
         `"Relatório gerado em: ${new Date().toLocaleString("pt-BR")}"`
-      ].join("\n");
+      ];
+      
+      const csvContent = BOM + rows.join("\r\n"); // IMPORTANTE: \r\n para Windows
 
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");
@@ -403,6 +420,9 @@ export default function ReportsPage() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      
+      // Limpar URL
+      setTimeout(() => URL.revokeObjectURL(url), 100);
     } catch (e) {
       console.error("Erro ao exportar CSV:", e);
       setError("Erro ao exportar relatório");
@@ -411,7 +431,7 @@ export default function ReportsPage() {
     }
   }
 
-  // Exportar PDF
+  // Exportar PDF - com tratamento especial para usuários
   function exportToPDF() {
     if (reportData.length === 0) {
       setError("Não há dados para exportar");
@@ -421,118 +441,12 @@ export default function ReportsPage() {
     setExporting(true);
 
     try {
-      const doc = new jsPDF('landscape', 'mm', 'a4');
-      const columns = getTableColumns();
-      
-      // Cabeçalho
-      doc.setFillColor(59, 130, 246);
-      doc.rect(0, 0, 297, 15, 'F');
-      
-      const reportTitle = REPORT_TYPES.find(type => type.value === reportType)?.label || "Relatório";
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(255, 255, 255);
-      doc.text(reportTitle.toUpperCase(), 2, 10); // Movido de 5 para 2
-      
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.text("SISTEMA DE GESTÃO DIABETES", 200, 10);
-      
-      doc.setTextColor(0, 0, 0);
-      
-      // Informações do relatório
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.text("PERÍODO:", 2, 22); // Movido de 5 para 2
-      doc.setFont("helvetica", "normal");
-      doc.text(`${new Date(startDate).toLocaleDateString("pt-BR")} até ${new Date(endDate).toLocaleDateString("pt-BR")}`, 20, 22);
-      
-      doc.setFont("helvetica", "bold");
-      doc.text("TOTAL:", 2, 28); // Movido de 5 para 2
-      doc.setFont("helvetica", "normal");
-      doc.text(`${reportData.length}`, 17, 28);
-      
-      doc.setFont("helvetica", "bold");
-      doc.text("GERADO:", 70, 28); // Movido de 75 para 70
-      doc.setFont("helvetica", "normal");
-      doc.text(`${new Date().toLocaleString("pt-BR")}`, 85, 28);
-      
-      // Linha separadora
-      doc.setDrawColor(200, 200, 200);
-      doc.line(2, 32, 295, 32); // Linha ainda mais larga (de 2 a 295)
-
-      // Calcular larguras inteligentes das colunas - AINDA MAIS ESPAÇO
-      const columnWidths = calculateColumnWidths(columns, reportData);
-      
-      // Preparar dados da tabela
-      const tableData = reportData.map(row => 
-        columns.map(col => {
-          let value = row[col] || "-";
-          const maxLength = getMaxLengthForColumn(col, columnWidths[col]);
-          if (typeof value === "string" && value.length > maxLength) {
-            value = value.substring(0, maxLength - 3) + "...";
-          }
-          return value;
-        })
-      );
-
-      // Criar estilos de coluna
-      const columnStyles: { [key: number]: any } = {};
-      columns.forEach((_, index) => {
-        columnStyles[index] = { 
-          cellWidth: columnWidths[columns[index]],
-          overflow: 'linebreak'
-        };
-      });
-
-      // Tabela - MARGENS MÍNIMAS
-      autoTable(doc, {
-        head: [columns.map(col => formatColumnLabel(col))],
-        body: tableData,
-        startY: 36,
-        theme: 'striped',
-        styles: {
-          fontSize: 7,
-          cellPadding: 2,
-          overflow: 'linebreak',
-          halign: 'left',
-          valign: 'middle'
-        },
-        headStyles: {
-          fillColor: [59, 130, 246],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-          fontSize: 8,
-          cellPadding: 2
-        },
-        alternateRowStyles: {
-          fillColor: [248, 250, 252]
-        },
-        columnStyles: columnStyles,
-        margin: { top: 36, right: 2, bottom: 20, left: 2 }, // Margens laterais mínimas de 2mm
-        tableWidth: 'auto',
-        didDrawPage: (data) => {
-          const pageHeight = doc.internal.pageSize.height;
-          const pageWidth = doc.internal.pageSize.width;
-          
-          doc.setDrawColor(200, 200, 200);
-          doc.line(2, pageHeight - 15, pageWidth - 2, pageHeight - 15); // Linha de rodapé máxima
-          
-          doc.setFontSize(7);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(100, 100, 100);
-          
-          doc.text(`Página ${data.pageNumber}`, 2, pageHeight - 8); // Movido para a extrema esquerda
-          doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, pageWidth - 60, pageHeight - 8);
-          
-          const systemText = "Sistema de Gestão Diabetes";
-          const textWidth = doc.getTextWidth(systemText);
-          doc.text(systemText, (pageWidth - textWidth) / 2, pageHeight - 8);
-        }
-      });
-
-      const fileName = `relatorio_${reportType}_${new Date().toISOString().split('T')[0]}.pdf`;
-      doc.save(fileName);
+      // Se for relatório de usuários, usar função específica
+      if (reportType === "users") {
+        exportUsersPDF();
+      } else {
+        exportGenericPDF();
+      }
     } catch (e) {
       console.error("Erro ao exportar PDF:", e);
       setError("Erro ao exportar relatório em PDF");
@@ -541,59 +455,384 @@ export default function ReportsPage() {
     }
   }
 
-  // Função para calcular larguras inteligentes das colunas - MÁXIMO ESPAÇO
+  // Exportar PDF específico para USUÁRIOS (com abreviações e layout otimizado)
+  function exportUsersPDF() {
+    const doc = new jsPDF('landscape', 'mm', 'a4');
+    
+    // Cabeçalho
+    doc.setFillColor(59, 130, 246);
+    doc.rect(0, 0, 297, 15, 'F');
+    
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.text("USUÁRIOS CADASTRADOS NO SISTEMA", 2, 10);
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text("SISTEMA DE GESTÃO DIABETES", 200, 10);
+    
+    doc.setTextColor(0, 0, 0);
+    
+    // Informações do relatório
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("PERÍODO:", 2, 22);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${new Date(startDate).toLocaleDateString("pt-BR")} até ${new Date(endDate).toLocaleDateString("pt-BR")}`, 20, 22);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("TOTAL:", 2, 28);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${reportData.length}`, 17, 28);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("GERADO:", 70, 28);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${new Date().toLocaleString("pt-BR")}`, 85, 28);
+    
+    doc.setDrawColor(200, 200, 200);
+    doc.line(2, 32, 295, 32);
+
+    // Colunas otimizadas para usuários (com abreviações)
+    const columns = [
+      { header: "Nome", dataKey: "nome" },
+      { header: "E-mail", dataKey: "email" },
+      { header: "Gên", dataKey: "genero" }, // Abreviado
+      { header: "Tipo Diab", dataKey: "diabetes" }, // Abreviado
+      { header: "Dura ção", dataKey: "duracao" }, // Abreviado
+      { header: "Pe so (kg)", dataKey: "peso" }, // Quebrado
+      { header: "Alt (c m)", dataKey: "altura" }, // Quebrado e abreviado
+      { header: "I M C", dataKey: "imc" }, // Espaçado
+      { header: "Acomp anham ento", dataKey: "acompanhamento" }, // Quebrado
+      { header: "Hipe rten so", dataKey: "hipertenso" }, // Quebrado
+      { header: "Possui Compli cações", dataKey: "possuiComplicacoes" }, // Quebrado
+      { header: "Descrição das Complicações", dataKey: "descricaoComplicacoes" },
+      { header: "Medicamentos", dataKey: "medicamentos" },
+      { header: "Sta tus", dataKey: "status" }, // Abreviado
+      { header: "Data C adastr o", dataKey: "dataCadastro" } // Quebrado
+    ];
+
+    // Larguras fixas otimizadas para usuários
+    const columnWidths: { [key: string]: number } = {
+      nome: 28,
+      email: 35,
+      genero: 12,
+      diabetes: 16,
+      duracao: 16,
+      peso: 14,
+      altura: 14,
+      imc: 12,
+      acompanhamento: 18,
+      hipertenso: 16,
+      possuiComplicacoes: 18,
+      descricaoComplicacoes: 35,
+      medicamentos: 35,
+      status: 14,
+      dataCadastro: 20
+    };
+
+    // Preparar dados com abreviações
+    const tableData = reportData.map(row => {
+      return {
+        nome: truncateText(row.nome || "-", 25),
+        email: truncateText(row.email || "-", 30),
+        genero: abbreviateGender(row.genero || "-"),
+        diabetes: abbreviateDiabetes(row.diabetes || "-"),
+        duracao: row.duracao || "-",
+        peso: row.peso || "-",
+        altura: row.altura || "-",
+        imc: row.imc || "-",
+        acompanhamento: row.acompanhamento === "Sim" ? "Sim" : "Não",
+        hipertenso: row.hipertenso === "Sim" ? "Sim" : "Não",
+        possuiComplicacoes: row.possuiComplicacoes === "Sim" ? "Sim" : "Não",
+        descricaoComplicacoes: truncateText(row.descricaoComplicacoes || "-", 35),
+        medicamentos: truncateText(row.medicamentos || "-", 35),
+        status: row.status === "Ativo" ? "Ativo" : "Inativo",
+        dataCadastro: row.dataCadastro || "-"
+      };
+    });
+
+    // Criar estilos de coluna
+    const columnStyles: { [key: string]: any } = {};
+    columns.forEach(col => {
+      columnStyles[col.dataKey] = { 
+        cellWidth: columnWidths[col.dataKey],
+        overflow: 'linebreak',
+        halign: 'left'
+      };
+    });
+
+    autoTable(doc, {
+      columns: columns,
+      body: tableData,
+      startY: 36,
+      theme: 'striped',
+      styles: {
+        fontSize: 7,
+        cellPadding: 1.5,
+        overflow: 'linebreak',
+        halign: 'left',
+        valign: 'middle',
+        lineColor: [200, 200, 200],
+        lineWidth: 0.1
+      },
+      headStyles: {
+        fillColor: [59, 130, 246],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 7,
+        cellPadding: 2,
+        halign: 'center',
+        valign: 'middle'
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      },
+      columnStyles: columnStyles,
+      margin: { top: 36, right: 2, bottom: 20, left: 2 },
+      tableWidth: 'auto',
+      didDrawPage: (data) => {
+        const pageHeight = doc.internal.pageSize.height;
+        const pageWidth = doc.internal.pageSize.width;
+        
+        doc.setDrawColor(200, 200, 200);
+        doc.line(2, pageHeight - 15, pageWidth - 2, pageHeight - 15);
+        
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(100, 100, 100);
+        
+        doc.text(`Página ${data.pageNumber}`, 2, pageHeight - 8);
+        doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, pageWidth - 60, pageHeight - 8);
+        
+        const systemText = "Sistema de Gestão Diabetes";
+        const textWidth = doc.getTextWidth(systemText);
+        doc.text(systemText, (pageWidth - textWidth) / 2, pageHeight - 8);
+      }
+    });
+
+    const fileName = `relatorio_usuarios_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+  }
+
+  // Exportar PDF genérico (para medicações, alimentos, complicações)
+  function exportGenericPDF() {
+    const doc = new jsPDF('landscape', 'mm', 'a4');
+    const columns = getTableColumns();
+    
+    // Cabeçalho
+    doc.setFillColor(59, 130, 246);
+    doc.rect(0, 0, 297, 15, 'F');
+    
+    const reportTitle = REPORT_TYPES.find(type => type.value === reportType)?.label || "Relatório";
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.text(reportTitle.toUpperCase(), 2, 10);
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text("SISTEMA DE GESTÃO DIABETES", 200, 10);
+    
+    doc.setTextColor(0, 0, 0);
+    
+    // Informações do relatório
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("PERÍODO:", 2, 22);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${new Date(startDate).toLocaleDateString("pt-BR")} até ${new Date(endDate).toLocaleDateString("pt-BR")}`, 20, 22);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("TOTAL:", 2, 28);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${reportData.length}`, 17, 28);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("GERADO:", 70, 28);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${new Date().toLocaleString("pt-BR")}`, 85, 28);
+    
+    doc.setDrawColor(200, 200, 200);
+    doc.line(2, 32, 295, 32);
+
+    // Calcular larguras dinâmicas
+    const columnWidths = calculateColumnWidths(columns, reportData);
+    
+    // Preparar dados da tabela
+    const tableData = reportData.map(row => 
+      columns.map(col => {
+        let value = row[col] || "-";
+        const maxLength = getMaxLengthForColumn(col, columnWidths[col]);
+        if (typeof value === "string" && value.length > maxLength) {
+          value = value.substring(0, maxLength - 3) + "...";
+        }
+        return value;
+      })
+    );
+
+    // Criar estilos de coluna
+    const columnStyles: { [key: number]: any } = {};
+    columns.forEach((col, index) => {
+      columnStyles[index] = { 
+        cellWidth: columnWidths[col],
+        overflow: 'linebreak',
+        halign: 'left'
+      };
+    });
+
+    autoTable(doc, {
+      head: [columns.map(col => formatColumnLabel(col))],
+      body: tableData,
+      startY: 36,
+      theme: 'striped',
+      styles: {
+        fontSize: 8,
+        cellPadding: 2.5,
+        overflow: 'linebreak',
+        halign: 'left',
+        valign: 'middle',
+        lineColor: [200, 200, 200],
+        lineWidth: 0.1
+      },
+      headStyles: {
+        fillColor: [59, 130, 246],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 9,
+        cellPadding: 3,
+        halign: 'left'
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      },
+      columnStyles: columnStyles,
+      margin: { top: 36, right: 2, bottom: 20, left: 2 },
+      tableWidth: 'wrap',
+      didDrawPage: (data) => {
+        const pageHeight = doc.internal.pageSize.height;
+        const pageWidth = doc.internal.pageSize.width;
+        
+        doc.setDrawColor(200, 200, 200);
+        doc.line(2, pageHeight - 15, pageWidth - 2, pageHeight - 15);
+        
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(100, 100, 100);
+        
+        doc.text(`Página ${data.pageNumber}`, 2, pageHeight - 8);
+        doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, pageWidth - 60, pageHeight - 8);
+        
+        const systemText = "Sistema de Gestão Diabetes";
+        const textWidth = doc.getTextWidth(systemText);
+        doc.text(systemText, (pageWidth - textWidth) / 2, pageHeight - 8);
+      }
+    });
+
+    const fileName = `relatorio_${reportType}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+  }
+
+  // Funções auxiliares de abreviação e truncamento
+  function truncateText(text: string, maxLength: number): string {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength - 3) + "...";
+  }
+
+  function abbreviateGender(gender: string): string {
+    const abbrev: { [key: string]: string } = {
+      "Masculino": "Masc",
+      "Feminino": "Fem",
+      "Outro": "Outro"
+    };
+    return abbrev[gender] || gender;
+  }
+
+  function abbreviateDiabetes(diabetes: string): string {
+    const abbrev: { [key: string]: string } = {
+      "Tipo 1": "Tipo 1",
+      "Tipo 2": "Tipo 2",
+      "Gestacional": "Gest",
+      "Outro": "Outro"
+    };
+    return abbrev[diabetes] || diabetes;
+  }
+
+  // Função para calcular larguras inteligentes das colunas - DINÂMICO POR TIPO
   function calculateColumnWidths(columns: string[], data: ReportData[]): { [key: string]: number } {
-    const totalWidth = 293; // Aumentado de 287 para 293 (297 - 4 margens mínimas)
+    const totalWidth = 293;
     const columnWidths: { [key: string]: number } = {};
     
-    const columnTypeWidths: { [key: string]: number } = {
-      imc: 15,
-      peso: 18,
-      altura: 18,
-      duracao: 20,
-      acompanhamento: 25,
-      hipertenso: 20,
-      possuiComplicacoes: 25,
-      status: 18,
-      dataCadastro: 25,
-      genero: 20,
-      diabetes: 20,
-      concentracao: 25,
-      formaFarmaceutica: 30,
-      viaAdministracao: 30,
-      carboidratosPor100g: 25,
-      carboidratosPorPorcao: 25,
+    // Larguras base por coluna
+    const baseWidths: { [key: string]: number } = {
+      // Colunas pequenas
+      imc: 12,
+      peso: 15,
+      altura: 15,
+      duracao: 18,
+      acompanhamento: 22,
+      hipertenso: 18,
+      possuiComplicacoes: 22,
+      status: 15,
+      dataCadastro: 22,
+      genero: 18,
+      diabetes: 18,
+      concentracao: 22,
+      carboidratosPor100g: 22,
+      carboidratosPorPorcao: 22,
+      
+      // Colunas médias
+      formaFarmaceutica: 28,
+      viaAdministracao: 28,
       classificacaoNova: 35,
+      descricaoPorcao: 28,
       nome: 35,
       nomeGenerico: 35,
       nomeComercial: 35,
-      descricaoPorcao: 30,
-      email: 40,
-      descricao: 45,
-      descricaoComplicacoes: 45,
-      medicamentos: 50,
-      palavrasChave: 40,
-      instrucoes: 45
+      email: 38,
+      
+      // Colunas grandes
+      descricao: 55,
+      descricaoComplicacoes: 55,
+      medicamentos: 55,
+      palavrasChave: 45,
+      instrucoes: 55
     };
     
-    let usedWidth = 0;
-    let undefinedColumns: string[] = [];
-    
+    // Calcular largura total usada
+    let totalUsed = 0;
     columns.forEach(col => {
-      if (columnTypeWidths[col]) {
-        columnWidths[col] = columnTypeWidths[col];
-        usedWidth += columnTypeWidths[col];
-      } else {
-        undefinedColumns.push(col);
+      if (baseWidths[col]) {
+        columnWidths[col] = baseWidths[col];
+        totalUsed += baseWidths[col];
       }
     });
     
-    const remainingWidth = totalWidth - usedWidth;
-    const widthPerUndefined = undefinedColumns.length > 0 ? remainingWidth / undefinedColumns.length : 0;
-    
-    undefinedColumns.forEach(col => {
-      columnWidths[col] = Math.max(20, widthPerUndefined);
-    });
+    // Se sobrou espaço, distribuir proporcionalmente
+    if (totalUsed < totalWidth) {
+      const remaining = totalWidth - totalUsed;
+      const factor = totalWidth / totalUsed;
+      
+      columns.forEach(col => {
+        if (columnWidths[col]) {
+          columnWidths[col] = Math.floor(columnWidths[col] * factor);
+        } else {
+          // Coluna não definida, usar largura padrão
+          columnWidths[col] = Math.floor(remaining / columns.length);
+        }
+      });
+    }
+    // Se ultrapassou, reduzir proporcionalmente
+    else if (totalUsed > totalWidth) {
+      const factor = totalWidth / totalUsed;
+      
+      columns.forEach(col => {
+        if (columnWidths[col]) {
+          columnWidths[col] = Math.floor(columnWidths[col] * factor);
+        }
+      });
+    }
     
     return columnWidths;
   }
